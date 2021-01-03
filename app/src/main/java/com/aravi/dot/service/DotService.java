@@ -116,7 +116,6 @@ public class DotService extends AccessibilityService {
                     didCameraUseStart = true;
                     showOnUseNotification();
                     showCamDot();
-                    triggerVibration();
                     makeLog();
                 }
 
@@ -135,7 +134,6 @@ public class DotService extends AccessibilityService {
                 if (sharedPreferenceManager.isMicIndicatorEnabled()) {
                     if (configs.size() > 0) {
                         showMicDot();
-                        triggerVibration();
                         isMicUnavailable = true;
                         showOnUseNotification();
 
@@ -161,7 +159,7 @@ public class DotService extends AccessibilityService {
                 .setContentText(getNotificationDescription(appUsingComponent))
                 .setContentIntent(getPendingIntent())
                 .setOngoing(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH);
+                .setWhen(System.currentTimeMillis());
 
         notificationManager = NotificationManagerCompat.from(getApplicationContext());
     }
@@ -261,17 +259,6 @@ public class DotService extends AccessibilityService {
      */
     private void setViewTint(ImageView imageView, String hex) {
         imageView.setColorFilter(Color.parseColor(hex), android.graphics.PorterDuff.Mode.SRC_IN);
-    }
-
-    private void triggerVibration() {
-        if (sharedPreferenceManager.isVibrationEnabled()) {
-            Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                v.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE));
-            } else {
-                v.vibrate(500);
-            }
-        }
     }
 
     private void initDotViews() {
