@@ -21,21 +21,11 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
-import com.aravi.dot.manager.SharedPreferenceManager
-import com.google.firebase.analytics.FirebaseAnalytics
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
-        if (SharedPreferenceManager.getInstance(this)?.isAnalyticsEnabled == true) {
-            FirebaseAnalytics.getInstance(this).setAnalyticsCollectionEnabled(true)
-            FirebaseCrashlytics.getInstance().setCrashlyticsCollectionEnabled(true)
-            if (FirebaseCrashlytics.getInstance().didCrashOnPreviousExecution()) {
-                FirebaseCrashlytics.getInstance().sendUnsentReports()
-            }
-        }
     }
 
     private fun createNotificationChannels() {

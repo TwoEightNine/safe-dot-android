@@ -20,13 +20,10 @@ package com.aravi.dot.activities.main;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentSender;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
-import android.view.accessibility.AccessibilityManager;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -37,20 +34,10 @@ import com.aravi.dot.activities.log.LogsActivity;
 import com.aravi.dot.databinding.ActivityMainBinding;
 import com.aravi.dot.manager.SharedPreferenceManager;
 import com.aravi.dot.service.DotService;
-import com.google.android.material.snackbar.Snackbar;
-import com.google.android.play.core.appupdate.AppUpdateInfo;
-import com.google.android.play.core.appupdate.AppUpdateManager;
-import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
-import com.google.android.play.core.install.model.AppUpdateType;
-import com.google.android.play.core.install.model.UpdateAvailability;
-import com.google.android.play.core.tasks.Task;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int MY_REQUEST_CODE = 1802;
-    private boolean TRIGGERED_START = false;
+
     private SharedPreferenceManager sharedPreferenceManager;
-    private Intent serviceIntent;
-    private AppUpdateManager appUpdateManager;
     private ActivityMainBinding mBinding;
 
     @Override
@@ -64,19 +51,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void init() {
-        mBinding.mainSwitch.setChecked(sharedPreferenceManager.isServiceEnabled() && checkAccessibility());
         mBinding.vibrationSwitch.setChecked(sharedPreferenceManager.isVibrationEnabled());
 
         mBinding.vibrationSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> sharedPreferenceManager.setVibrationEnabled(isChecked));
-        mBinding.mainSwitch.setOnCheckedChangeListener((buttonView, b) -> {
-            if (b) {
-                checkForAccessibilityAndStart();
-                TRIGGERED_START = true;
-            } else {
-                stopService();
-                TRIGGERED_START = false;
-            }
-        });
         mBinding.align.setOnCheckedChangeListener((group, i) -> {
             // fixed: Resource IDs will be non-final in Android Gradle Plugin version 5.0, avoid using them in switch case statements
             // fix source : http://tools.android.com/tips/non-constant-fields
@@ -86,10 +63,6 @@ public class MainActivity extends AppCompatActivity {
                 sharedPreferenceManager.setPosition(1);
             }
         });
-
-        mBinding.twitterButton.setOnClickListener(v -> openWeb("https://www.twitter.com/kamaravichow"));
-        mBinding.githubButton.setOnClickListener(v -> openWeb("https://www.github.com/kamaravichow"));
-        mBinding.premiumVersion.setOnClickListener(view -> openWeb("https://play.google.com/store/apps/details?id=com.aravi.dotpro"));
         mBinding.logsOption.setOnClickListener(view -> {
             Intent intent = new Intent(MainActivity.this, LogsActivity.class);
             startActivity(intent);
@@ -100,12 +73,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkForAccessibilityAndStart() {
         if (!accessibilityPermission(getApplicationContext(), DotService.class)) {
-            mBinding.mainSwitch.setChecked(false);
             startActivity(new Intent("android.settings.ACCESSIBILITY_SETTINGS"));
         } else {
-            mBinding.mainSwitch.setChecked(true);
-            sharedPreferenceManager.setServiceEnabled(true);
-            serviceIntent = new Intent(MainActivity.this, DotService.class);
+            Intent serviceIntent = new Intent(MainActivity.this, DotService.class);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(serviceIntent);
             } else {
@@ -114,59 +84,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void stopService() {
-        if (isAccessibilityServiceRunning()) {
-            sharedPreferenceManager.setServiceEnabled(false);
-            Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
-            startActivity(intent);
-        }
-        showSnack(getString(R.string.close_app_note));
-    }
-
     @Override
     protected void onResume() {
         super.onResume();
-        if (TRIGGERED_START) {
-            TRIGGERED_START = false;
-            checkForAccessibilityAndStart();
-        }
-        if (!sharedPreferenceManager.isServiceEnabled()) {
-            mBinding.mainSwitch.setChecked(checkAccessibility());
-        }
+        checkForAccessibilityAndStart();
     }
 
-    private void checkForAppUpdates() {
-        appUpdateManager = AppUpdateManagerFactory.create(MainActivity.this);
-        Task<AppUpdateInfo> appUpdateInfoTask = appUpdateManager.getAppUpdateInfo();
-        appUpdateInfoTask.addOnSuccessListener(appUpdateInfo -> {
-            if (appUpdateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE && appUpdateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
-                try {
-                    appUpdateManager.startUpdateFlowForResult(appUpdateInfo, AppUpdateType.IMMEDIATE, this, MY_REQUEST_CODE);
-                } catch (IntentSender.SendIntentException e) {
-                    e.printStackTrace();
-                }
-
-            }
-        });
-
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == MY_REQUEST_CODE) {
-            if (resultCode != RESULT_OK) {
-                showSnack(getString(R.string.update_failed_note));
-                checkForAppUpdates();
-            }
-        }
-    }
-
-    /**
-     * @param context
-     * @param cls
-     * @return
-     */
     public static boolean accessibilityPermission(Context context, Class<?> cls) {
         ComponentName componentName = new ComponentName(context, cls);
         String string = Settings.Secure.getString(context.getContentResolver(), "enabled_accessibility_services");
@@ -184,48 +107,6 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-
-    private void sendFeedbackEmail() {
-        Intent emailIntent = new Intent(Intent.ACTION_SENDTO, Uri.fromParts("mailto", getString(R.string.feedback_email_address), null));
-        emailIntent.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.feedback_subject));
-        emailIntent.putExtra(Intent.EXTRA_TEXT, "Device Information : \n----- Don't clear these ----\n " + Build.DEVICE + " ,\n " + Build.BOARD + " ,\n " + Build.BRAND + " , " + Build.MANUFACTURER + " ,\n " + Build.MODEL + "\n ------ ");
-        startActivity(Intent.createChooser(emailIntent, "Send feedback..."));
-    }
-
-
-    /**
-     * @return
-     */
-    private boolean checkAccessibility() {
-        AccessibilityManager manager = (AccessibilityManager) getSystemService(Context.ACCESSIBILITY_SERVICE);
-        return manager.isEnabled();
-    }
-
-    /**
-     * @return
-     */
-    private boolean isAccessibilityServiceRunning() {
-        String prefString = Settings.Secure.getString(this.getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        return prefString != null && prefString.contains(this.getPackageName() + "/" + DotService.class.getName());
-    }
-
-
-    /**
-     * @param message
-     */
-    private void showSnack(String message) {
-        Snackbar.make(findViewById(android.R.id.content), message, Snackbar.LENGTH_LONG).show();
-    }
-
-    /**
-     * @param url
-     */
-    private void openWeb(String url) {
-        Intent i = new Intent(Intent.ACTION_VIEW);
-        i.setData(Uri.parse(url));
-        startActivity(i);
-    }
-
     /**
      * Chinese ROM's kill the app services frequently so AutoStart Permission is required
      */
@@ -240,10 +121,5 @@ public class MainActivity extends AppCompatActivity {
                 sharedPreferenceManager.setFirstLaunch();
             }
         }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
     }
 }
